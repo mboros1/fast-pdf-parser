@@ -112,7 +112,7 @@ TEST_F(JsonSerializerTest, ChunkDocumentRespectMaxTokens) {
 
 TEST_F(JsonSerializerTest, SerializeChunks) {
     auto doc = CreateMockDocument();
-    auto chunks = fast_pdf_parser::JsonSerializer::chunk_document(doc);
+    auto chunks = fast_pdf_parser::JsonSerializer::chunk_document(doc, 512, true);
     
     std::string serialized = fast_pdf_parser::JsonSerializer::serialize_chunks(chunks);
     
@@ -171,6 +171,6 @@ TEST_F(JsonSerializerTest, EmptyDocument) {
         {"version", "1.0.0"}
     };
     
-    auto chunks = fast_pdf_parser::JsonSerializer::chunk_document(empty_doc);
+    auto chunks = fast_pdf_parser::JsonSerializer::chunk_document(empty_doc, 512, true);
     EXPECT_TRUE(chunks.empty());
 }

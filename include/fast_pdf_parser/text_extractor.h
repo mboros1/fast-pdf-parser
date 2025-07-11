@@ -23,6 +23,8 @@ public:
     
     nlohmann::json extract_all_pages(const std::string& pdf_path,
                                     const ExtractOptions& options = ExtractOptions{});
+    
+    int get_page_count(const std::string& pdf_path);
 
 private:
     class Impl;

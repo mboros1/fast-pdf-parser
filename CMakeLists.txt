@@ -65,6 +65,8 @@ target_link_libraries(fastpdfparser
         nlohmann_json::nlohmann_json
     PRIVATE
         ${MUPDF_LIBRARIES}
+        /opt/homebrew/lib/libmupdf-third.a
+        z
 )
 
 target_compile_options(fastpdfparser PRIVATE ${MUPDF_CFLAGS_OTHER})
@@ -73,9 +75,26 @@ target_compile_options(fastpdfparser PRIVATE ${MUPDF_CFLAGS_OTHER})
 add_executable(fast-pdf-parser src/main.cpp)
 target_link_libraries(fast-pdf-parser PRIVATE fastpdfparser)
 
+# Simple test executable
+add_executable(simple-test src/simple_test.cpp)
+target_link_libraries(simple-test PRIVATE fastpdfparser)
+
+# Stream test executable
+add_executable(stream-test src/stream_test.cpp)
+target_link_libraries(stream-test PRIVATE fastpdfparser)
+
+# Performance test executable
+add_executable(perf-test src/perf_test.cpp)
+target_link_libraries(perf-test PRIVATE fastpdfparser)
+
+# Limited test executable
+add_executable(limited-test src/limited_test.cpp)
+target_link_libraries(limited-test PRIVATE fastpdfparser)
+
 # Benchmarking executable
-add_executable(benchmark benchmark/benchmark.cpp)
-target_link_libraries(benchmark PRIVATE fastpdfparser)
+find_package(benchmark REQUIRED CONFIG)
+add_executable(fast_pdf_benchmark benchmark/benchmark.cpp)
+target_link_libraries(fast_pdf_benchmark PRIVATE fastpdfparser benchmark::benchmark)
 
 # Tests
 enable_testing()

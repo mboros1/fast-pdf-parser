@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <thread>
 #include <nlohmann/json.hpp>
 
 namespace fast_pdf_parser {

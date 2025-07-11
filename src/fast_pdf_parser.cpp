@@ -6,6 +6,7 @@
 #include <chrono>
 #include <fstream>
 #include <sstream>
+#include <iostream>
 
 namespace fast_pdf_parser {
 
@@ -54,25 +55,32 @@ public:
     }
 
     void parse_streaming(const std::string& pdf_path, PageCallback callback) {
+        std::cout << "[FastPdfParser::parse_streaming] Starting streaming parse for " << pdf_path << std::endl;
+        
         if (!std::filesystem::exists(pdf_path)) {
             throw std::runtime_error("PDF file not found: " + pdf_path);
         }
+        std::cout << "[FastPdfParser::parse_streaming] File exists" << std::endl;
 
         TextExtractor extractor;
         ExtractOptions extract_opts;
         extract_opts.extract_positions = options_.extract_positions;
         extract_opts.extract_fonts = options_.extract_fonts;
         extract_opts.extract_colors = options_.extract_colors;
+        
+        std::cout << "[FastPdfParser::parse_streaming] Extract options set - positions: " << extract_opts.extract_positions 
+                  << ", fonts: " << extract_opts.extract_fonts << std::endl;
 
         // Get page count first
-        auto doc_info = extractor.extract_all_pages(pdf_path, extract_opts);
-        size_t page_count = doc_info["pages"].size();
+        std::cout << "[FastPdfParser::parse_streaming] Getting page count" << std::endl;
+        int page_count = extractor.get_page_count(pdf_path);
+        std::cout << "[FastPdfParser::parse_streaming] Page count: " << page_count << std::endl;
         
         // Process pages in parallel batches
         std::vector<std::future<PageResult>> futures;
         
         for (size_t i = 0; i < page_count; i += options_.batch_size) {
-            size_t batch_end = std::min(i + options_.batch_size, page_count);
+            size_t batch_end = std::min(i + options_.batch_size, static_cast<size_t>(page_count));
             
             for (size_t page_idx = i; page_idx < batch_end; ++page_idx) {
                 futures.push_back(

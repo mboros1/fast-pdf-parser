@@ -55,7 +55,7 @@ void process_directory(const std::string& input_dir, const std::string& output_d
         }
         
         // Chunk the document
-        auto chunks = JsonSerializer::chunk_document(result);
+        auto chunks = JsonSerializer::chunk_document(result, 512, true);
         
         // Generate output filename
         auto pdf_filename = fs::path(pdf_path).stem().string();

@@ -29,7 +29,7 @@ void process_single_file(const std::string& pdf_path, const std::string& output_
         auto result = parser.parse(pdf_path);
         
         // Chunk the document
-        auto chunks = fast_pdf_parser::JsonSerializer::chunk_document(result);
+        auto chunks = fast_pdf_parser::JsonSerializer::chunk_document(result, 512, true);
         
         // Create output directory
         fs::create_directories(output_dir);
@@ -106,7 +106,7 @@ void process_directory(const std::string& input_dir, const std::string& output_d
         }
         
         // Chunk and save
-        auto chunks = fast_pdf_parser::JsonSerializer::chunk_document(result);
+        auto chunks = fast_pdf_parser::JsonSerializer::chunk_document(result, 512, true);
         auto pdf_filename = fs::path(pdf_path).stem().string();
         auto output_path = fs::path(output_dir) / (pdf_filename + "_chunks.json");
         
