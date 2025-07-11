@@ -1,0 +1,43 @@
+# Project management files
+CLAUDE.md
+ONBOARDING.md
+.claude_context/
+
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# C++ build artifacts
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Test output
+test_output/
+benchmark_results/
+
+# Dependencies
+vcpkg_installed/
+conan/
+.conan2/
