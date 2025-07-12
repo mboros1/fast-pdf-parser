@@ -2,7 +2,7 @@
 
 ## Hierarchical Chunker (hierarchical_chunker.cpp)
 - Main implementation using 7-pass hierarchical chunking algorithm
-- Uses **rapidjson** for JSON output
+- Uses **nlohmann/json** for consistent JSON handling
 - Eliminates bimodal distribution problem
 - Produces chunks primarily in 400-550 token range
 - Compilation: `make hierarchical-chunker`

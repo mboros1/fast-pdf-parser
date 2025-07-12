@@ -1,7 +1,6 @@
 #include "fast_pdf_parser/fast_pdf_parser.h"
 #include "fast_pdf_parser/thread_pool.h"
 #include "fast_pdf_parser/text_extractor.h"
-#include "fast_pdf_parser/json_serializer.h"
 #include <filesystem>
 #include <chrono>
 #include <fstream>
@@ -39,9 +38,9 @@ public:
         
         auto raw_output = extractor.extract_all_pages(pdf_path, extract_opts);
         
-        // Convert to Docling format
-        auto filename = std::filesystem::path(pdf_path).filename().string();
-        auto docling_output = JsonSerializer::to_docling_format(raw_output, filename, file_hash);
+        // Convert to Docling format - removed JsonSerializer dependency
+        // This method is not used by hierarchical_chunker
+        auto docling_output = raw_output;
         
         // Update statistics
         auto end_time = std::chrono::high_resolution_clock::now();

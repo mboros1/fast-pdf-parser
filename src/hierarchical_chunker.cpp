@@ -4,9 +4,7 @@
 #include <fstream>
 #include <chrono>
 #include <filesystem>
-#include <rapidjson/document.h>
-#include <rapidjson/writer.h>
-#include <rapidjson/stringbuffer.h>
+#include <nlohmann/json.hpp>
 #include <regex>
 #include <algorithm>
 #include <numeric>
@@ -622,63 +620,46 @@ int main(int argc, char* argv[]) {
         std::string pdf_name = fs::path(argv[1]).stem().string();
         std::ofstream outfile("./out/" + pdf_name + "_hierarchical_chunks.json");
         
-        outfile << "[\n";
+        nlohmann::json output = nlohmann::json::array();
         
         for (size_t i = 0; i < chunks.size(); ++i) {
             const auto& chunk = chunks[i];
             
-            if (i > 0) outfile << ",\n";
+            nlohmann::json chunk_json;
+            chunk_json["text"] = chunk.text;
             
-            rapidjson::Document chunk_doc;
-            chunk_doc.SetObject();
-            auto& alloc = chunk_doc.GetAllocator();
-            
-            rapidjson::Value text_val;
-            text_val.SetString(chunk.text.c_str(), chunk.text.length(), alloc);
-            chunk_doc.AddMember("text", text_val, alloc);
-            
-            rapidjson::Value meta;
-            meta.SetObject();
-            
-            meta.AddMember("schema_name", "docling_core.transforms.chunker.DocMeta", alloc);
-            meta.AddMember("version", "1.0.0", alloc);
-            meta.AddMember("start_page", chunk.start_page, alloc);
-            meta.AddMember("end_page", chunk.end_page, alloc);
-            meta.AddMember("page_count", chunk.end_page - chunk.start_page + 1, alloc);
-            meta.AddMember("chunk_index", static_cast<int>(i), alloc);
-            meta.AddMember("total_chunks", static_cast<int>(chunks.size()), alloc);
-            meta.AddMember("token_count", chunk.tokens, alloc);
-            meta.AddMember("has_major_heading", chunk.has_major_heading, alloc);
-            meta.AddMember("min_heading_level", chunk.min_heading_level, alloc);
+            nlohmann::json meta;
+            meta["schema_name"] = "docling_core.transforms.chunker.DocMeta";
+            meta["version"] = "1.0.0";
+            meta["start_page"] = chunk.start_page;
+            meta["end_page"] = chunk.end_page;
+            meta["page_count"] = chunk.end_page - chunk.start_page + 1;
+            meta["chunk_index"] = static_cast<int>(i);
+            meta["total_chunks"] = static_cast<int>(chunks.size());
+            meta["token_count"] = chunk.tokens;
+            meta["has_major_heading"] = chunk.has_major_heading;
+            meta["min_heading_level"] = chunk.min_heading_level;
             
             if (chunk.overlap_tokens > 0) {
-                meta.AddMember("overlap_tokens", chunk.overlap_tokens, alloc);
+                meta["overlap_tokens"] = chunk.overlap_tokens;
             }
             
-            rapidjson::Value origin;
-            origin.SetObject();
-            origin.AddMember("mimetype", "application/pdf", alloc);
-            origin.AddMember("binary_hash", file_hash, alloc);
+            nlohmann::json origin;
+            origin["mimetype"] = "application/pdf";
+            origin["binary_hash"] = file_hash;
+            origin["filename"] = fs::path(argv[1]).filename().string();
+            origin["uri"] = nullptr;
             
-            rapidjson::Value filename;
-            filename.SetString(fs::path(argv[1]).filename().string().c_str(), alloc);
-            origin.AddMember("filename", filename, alloc);
-            origin.AddMember("uri", rapidjson::Value().SetNull(), alloc);
+            meta["origin"] = origin;
+            meta["doc_items"] = nlohmann::json::array();
+            meta["headings"] = nlohmann::json::array();
+            meta["captions"] = nullptr;
             
-            meta.AddMember("origin", origin, alloc);
-            meta.AddMember("doc_items", rapidjson::Value(rapidjson::kArrayType), alloc);
-            meta.AddMember("headings", rapidjson::Value(rapidjson::kArrayType), alloc);
-            meta.AddMember("captions", rapidjson::Value().SetNull(), alloc);
-            
-            chunk_doc.AddMember("meta", meta, alloc);
-            
-            rapidjson::StringBuffer buffer;
-            rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-            chunk_doc.Accept(writer);
-            outfile << buffer.GetString();
+            chunk_json["meta"] = meta;
+            output.push_back(chunk_json);
         }
         
-        outfile << "\n]\n";
+        outfile << output.dump(2);
         outfile.close();
         
         auto end = std::chrono::high_resolution_clock::now();
