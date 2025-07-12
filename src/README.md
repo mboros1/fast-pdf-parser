@@ -13,10 +13,6 @@
 - **thread_pool.cpp** - Multi-threaded page processing
 - **text_extractor.cpp** - MuPDF-based text extraction from PDF pages
 
-## Test Files
-- **perf_test.cpp** - Performance benchmarking with different thread counts
-- **token_test.cpp** - Tiktoken tokenizer testing
-
 ## Architecture
 The implementation follows a clean separation:
 1. PDF parsing layer (MuPDF integration)

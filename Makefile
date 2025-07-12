@@ -33,10 +33,10 @@ hierarchical-chunker: $(OBJS) src/hierarchical_chunker.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 # Test programs
-perf-test: $(OBJS) src/perf_test.o
+perf-test: $(OBJS) tests/perf_test.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
-token-test: src/token_test.o
+token-test: tests/token_test.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 benchmark-passes: benchmarks/benchmark_passes.o
