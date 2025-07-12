@@ -11,14 +11,11 @@ namespace fast_pdf_parser {
 class TextExtractor::Impl {
 public:
     Impl() {
-        std::cout << "[TextExtractor::Impl] Creating MuPDF context" << std::endl;
         ctx = fz_new_context(NULL, NULL, FZ_STORE_UNLIMITED);
         if (!ctx) {
             throw std::runtime_error("Failed to create MuPDF context");
         }
-        std::cout << "[TextExtractor::Impl] MuPDF context created" << std::endl;
         fz_register_document_handlers(ctx);
-        std::cout << "[TextExtractor::Impl] Document handlers registered" << std::endl;
     }
     
     ~Impl() {
@@ -29,7 +26,9 @@ public:
 
     nlohmann::json extract_page(const std::string& pdf_path, int page_number, 
                                const ExtractOptions& options) {
-        std::cout << "[TextExtractor::extract_page] Starting extraction for page " << page_number << " from " << pdf_path << std::endl;
+        if (page_number % 50 == 0) {
+            std::cout << "[TextExtractor::extract_page] Extracting page " << page_number << std::endl;
+        }
         
         fz_document *doc = nullptr;
         fz_page *page = nullptr;
@@ -41,40 +40,29 @@ public:
         
         nlohmann::json result;
         
-        std::cout << "[TextExtractor::extract_page] About to open document" << std::endl;
         fz_try(ctx) {
             doc = fz_open_document(ctx, pdf_path.c_str());
-            std::cout << "[TextExtractor::extract_page] Document opened successfully" << std::endl;
             if (!doc) {
                 throw std::runtime_error("Failed to open PDF document");
             }
             
             int page_count = fz_count_pages(ctx, doc);
-            std::cout << "[TextExtractor::extract_page] Document has " << page_count << " pages" << std::endl;
             if (page_number < 0 || page_number >= page_count) {
                 throw std::out_of_range("Page number out of range");
             }
             
-            std::cout << "[TextExtractor::extract_page] Loading page " << page_number << std::endl;
             page = fz_load_page(ctx, doc, page_number);
-            std::cout << "[TextExtractor::extract_page] Page loaded successfully" << std::endl;
             
             // Extract structured text
             fz_stext_options opts = { 0 };
             opts.flags = FZ_STEXT_PRESERVE_LIGATURES | FZ_STEXT_PRESERVE_WHITESPACE;
-            if (!options.extract_positions) {
-                opts.flags |= FZ_STEXT_INHIBIT_SPACES;
-            }
+            // Don't inhibit spaces - we need them for proper text extraction
             
-            std::cout << "[TextExtractor::extract_page] Creating structured text page" << std::endl;
             stext = fz_new_stext_page_from_page(ctx, page, &opts);
-            std::cout << "[TextExtractor::extract_page] Structured text created" << std::endl;
             
             // Convert to JSON
-            std::cout << "[TextExtractor::extract_page] Converting to JSON" << std::endl;
             result = stext_to_json(stext, options);
             result["page_number"] = page_number;
-            std::cout << "[TextExtractor::extract_page] JSON conversion complete" << std::endl;
         }
         fz_always(ctx) {
             if (stext) fz_drop_stext_page(ctx, stext);
@@ -111,11 +99,12 @@ public:
             result["page_count"] = page_count;
             
             for (int i = 0; i < page_count; ++i) {
-                std::cout << "[TextExtractor::extract_all_pages] Processing page " << i << "/" << page_count << std::endl;
+                if (i % 50 == 0) {
+                    std::cout << "[TextExtractor::extract_all_pages] Processing page " << i << "/" << page_count << std::endl;
+                }
                 try {
                     auto page_data = extract_page(pdf_path, i, options);
                     result["pages"].push_back(page_data);
-                    std::cout << "[TextExtractor::extract_all_pages] Page " << i << " added to results" << std::endl;
                 } catch (const std::exception& e) {
                     // Log error but continue processing
                     nlohmann::json error_page;
@@ -263,12 +252,8 @@ public:
     fz_context *ctx;
 };
 
-TextExtractor::TextExtractor() : pImpl(std::make_unique<Impl>()) {
-    std::cout << "[TextExtractor] Constructor called" << std::endl;
-}
-TextExtractor::~TextExtractor() {
-    std::cout << "[TextExtractor] Destructor called" << std::endl;
-}
+TextExtractor::TextExtractor() : pImpl(std::make_unique<Impl>()) {}
+TextExtractor::~TextExtractor() = default;
 
 nlohmann::json TextExtractor::extract_page(const std::string& pdf_path, int page_number, 
                                           const ExtractOptions& options) {

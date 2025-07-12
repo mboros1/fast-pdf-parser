@@ -26,7 +26,7 @@ struct PageResult {
 };
 
 using ProgressCallback = std::function<void(size_t current, size_t total)>;
-using PageCallback = std::function<void(PageResult)>;
+using PageCallback = std::function<bool(PageResult)>; // Return false to stop processing
 
 class FastPdfParser {
 public:

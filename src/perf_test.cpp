@@ -11,7 +11,11 @@ int main(int argc, char* argv[]) {
 
     try {
         // Test different thread counts
-        std::vector<size_t> thread_counts = {1, 2, 4, 8};
+        size_t max_threads = std::thread::hardware_concurrency();
+        std::vector<size_t> thread_counts = {1, 2, 4};
+        if (max_threads >= 8) thread_counts.push_back(8);
+        if (max_threads >= 16) thread_counts.push_back(16);
+        thread_counts.push_back(max_threads - 1);
         
         for (size_t threads : thread_counts) {
             fast_pdf_parser::ParseOptions options;
@@ -28,7 +32,7 @@ int main(int argc, char* argv[]) {
             std::atomic<size_t> page_count{0};
             std::atomic<size_t> error_count{0};
             
-            parser.parse_streaming(argv[1], [&page_count, &error_count](fast_pdf_parser::PageResult result) {
+            parser.parse_streaming(argv[1], [&page_count, &error_count](fast_pdf_parser::PageResult result) -> bool {
                 if (result.success) {
                     page_count++;
                     if (page_count % 100 == 0) {
@@ -37,6 +41,7 @@ int main(int argc, char* argv[]) {
                 } else {
                     error_count++;
                 }
+                return true; // Continue processing all pages
             });
             
             auto end = std::chrono::high_resolution_clock::now();

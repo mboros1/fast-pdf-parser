@@ -55,26 +55,20 @@ public:
     }
 
     void parse_streaming(const std::string& pdf_path, PageCallback callback) {
-        std::cout << "[FastPdfParser::parse_streaming] Starting streaming parse for " << pdf_path << std::endl;
-        
         if (!std::filesystem::exists(pdf_path)) {
             throw std::runtime_error("PDF file not found: " + pdf_path);
         }
-        std::cout << "[FastPdfParser::parse_streaming] File exists" << std::endl;
 
         TextExtractor extractor;
         ExtractOptions extract_opts;
         extract_opts.extract_positions = options_.extract_positions;
         extract_opts.extract_fonts = options_.extract_fonts;
         extract_opts.extract_colors = options_.extract_colors;
-        
-        std::cout << "[FastPdfParser::parse_streaming] Extract options set - positions: " << extract_opts.extract_positions 
-                  << ", fonts: " << extract_opts.extract_fonts << std::endl;
 
         // Get page count first
-        std::cout << "[FastPdfParser::parse_streaming] Getting page count" << std::endl;
         int page_count = extractor.get_page_count(pdf_path);
-        std::cout << "[FastPdfParser::parse_streaming] Page count: " << page_count << std::endl;
+        std::cout << "Starting to process " << page_count << " pages with " 
+                  << options_.thread_count << " threads" << std::endl;
         
         // Process pages in parallel batches
         std::vector<std::future<PageResult>> futures;
@@ -103,10 +97,22 @@ public:
             }
             
             // Wait for batch completion and invoke callbacks
+            bool should_continue = true;
             for (auto& future : futures) {
-                callback(future.get());
+                if (should_continue) {
+                    should_continue = callback(future.get());
+                } else {
+                    // Still need to get() all futures to avoid dangling threads
+                    future.get();
+                }
             }
             futures.clear();
+            
+            // Stop processing if callback returned false
+            if (!should_continue) {
+                std::cout << "Stopping page processing as requested by callback" << std::endl;
+                break;
+            }
         }
     }
 

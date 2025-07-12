@@ -2,6 +2,8 @@
 #include <iostream>
 #include <chrono>
 #include <atomic>
+#include <thread>
+#include <algorithm>
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -11,33 +13,41 @@ int main(int argc, char* argv[]) {
 
     try {
         fast_pdf_parser::ParseOptions options;
-        options.thread_count = 4;
+        options.thread_count = std::max(1u, std::thread::hardware_concurrency() - 1);
         options.batch_size = 10;
         options.extract_positions = false;  // Faster without positions
         options.extract_fonts = false;      // Faster without fonts
         
         fast_pdf_parser::FastPdfParser parser(options);
         
-        std::cout << "Testing with 4 threads, processing first 100 pages..." << std::endl;
+        std::cout << "Testing with " << options.thread_count << " threads (out of " 
+                  << std::thread::hardware_concurrency() << " available), processing first 100 pages..." << std::endl;
         auto start = std::chrono::high_resolution_clock::now();
         
         std::atomic<size_t> page_count{0};
         std::atomic<bool> should_stop{false};
         
-        parser.parse_streaming(argv[1], [&page_count, &should_stop](fast_pdf_parser::PageResult result) {
-            if (should_stop.load()) return;
+        parser.parse_streaming(argv[1], [&page_count, &should_stop, &start](fast_pdf_parser::PageResult result) -> bool {
+            if (should_stop.load()) return false;
             
             if (result.success) {
                 page_count++;
-                if (page_count % 10 == 0) {
-                    std::cout << "Processed " << page_count << " pages..." << std::endl;
+                if (page_count % 50 == 0) {
+                    auto now = std::chrono::high_resolution_clock::now();
+                    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
+                    double pages_per_sec = (page_count * 1000.0) / elapsed.count();
+                    std::cout << "Processed " << page_count << " pages in " 
+                             << elapsed.count() << "ms (" 
+                             << pages_per_sec << " pages/sec)" << std::endl;
                 }
                 
                 if (page_count >= 100) {
                     should_stop = true;
                     std::cout << "Reached 100 pages, stopping..." << std::endl;
+                    return false; // Stop processing
                 }
             }
+            return true; // Continue processing
         });
         
         auto end = std::chrono::high_resolution_clock::now();
