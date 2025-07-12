@@ -10,22 +10,16 @@ LDFLAGS = -L/opt/homebrew/lib \
           -L/opt/homebrew/Cellar/mupdf-tools/1.26.3/lib \
           -lmupdf -lmupdf-third -lz -pthread
 
-# Core PDF parsing files (used by hierarchical-chunker)
-CORE_SRCS = src/fast_pdf_parser.cpp \
-            src/thread_pool.cpp \
-            src/text_extractor.cpp
-
-# Additional files for original fast-pdf-parser
-PARSER_SRCS = src/json_serializer.cpp \
-              src/batch_processor.cpp
+# Source files
+SRCS = src/fast_pdf_parser.cpp \
+       src/thread_pool.cpp \
+       src/text_extractor.cpp
 
 # Object files
-CORE_OBJS = $(CORE_SRCS:.cpp=.o)
-PARSER_OBJS = $(PARSER_SRCS:.cpp=.o)
-ALL_OBJS = $(CORE_OBJS) $(PARSER_OBJS)
+OBJS = $(SRCS:.cpp=.o)
 
 # Executables
-TARGETS = fast-pdf-parser perf-test token-test hierarchical-chunker benchmark-passes tokenizer-example
+TARGETS = hierarchical-chunker perf-test token-test benchmark-passes tokenizer-example
 
 # Default target
 all: $(TARGETS)
@@ -34,19 +28,15 @@ all: $(TARGETS)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Main CLI (uses nlohmann json)
-fast-pdf-parser: $(ALL_OBJS) src/main.o
+# Main implementation
+hierarchical-chunker: $(OBJS) src/hierarchical_chunker.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 # Test programs
-perf-test: $(CORE_OBJS) src/perf_test.o
+perf-test: $(OBJS) src/perf_test.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 token-test: src/token_test.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-
-# Our main implementation (uses rapidjson)
-hierarchical-chunker: $(CORE_OBJS) src/hierarchical_chunker.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 benchmark-passes: benchmarks/benchmark_passes.o
@@ -57,7 +47,7 @@ tokenizer-example: examples/tokenizer_example.o
 
 # Clean
 clean:
-	rm -f $(ALL_OBJS) src/*.o benchmarks/*.o examples/*.o tests/*.o $(TARGETS)
+	rm -f $(OBJS) src/*.o benchmarks/*.o examples/*.o tests/*.o $(TARGETS)
 	rm -rf out/
 	rm -f *.cmake *.sh
 	rm -f cl100k_base.tiktoken
