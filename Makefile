@@ -10,18 +10,22 @@ LDFLAGS = -L/opt/homebrew/lib \
           -L/opt/homebrew/Cellar/mupdf-tools/1.26.3/lib \
           -lmupdf -lmupdf-third -lz -pthread
 
-# Source files
-SRCS = src/fast_pdf_parser.cpp \
-       src/thread_pool.cpp \
-       src/text_extractor.cpp \
-       src/json_serializer.cpp \
-       src/batch_processor.cpp
+# Core PDF parsing files (used by hierarchical-chunker)
+CORE_SRCS = src/fast_pdf_parser.cpp \
+            src/thread_pool.cpp \
+            src/text_extractor.cpp
+
+# Additional files for original fast-pdf-parser
+PARSER_SRCS = src/json_serializer.cpp \
+              src/batch_processor.cpp
 
 # Object files
-OBJS = $(SRCS:.cpp=.o)
+CORE_OBJS = $(CORE_SRCS:.cpp=.o)
+PARSER_OBJS = $(PARSER_SRCS:.cpp=.o)
+ALL_OBJS = $(CORE_OBJS) $(PARSER_OBJS)
 
 # Executables
-TARGETS = fast-pdf-parser simple-test stream-test perf-test limited-test fast-output-test token-test hierarchical-chunker benchmark-passes tokenizer-example
+TARGETS = fast-pdf-parser perf-test token-test hierarchical-chunker benchmark-passes tokenizer-example
 
 # Default target
 all: $(TARGETS)
@@ -30,30 +34,19 @@ all: $(TARGETS)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Main CLI
-fast-pdf-parser: $(OBJS) src/main.o
+# Main CLI (uses nlohmann json)
+fast-pdf-parser: $(ALL_OBJS) src/main.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 # Test programs
-simple-test: $(OBJS) src/simple_test.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-
-stream-test: $(OBJS) src/stream_test.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-
-perf-test: $(OBJS) src/perf_test.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-
-limited-test: $(OBJS) src/limited_test.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-
-fast-output-test: $(OBJS) src/fast_output_test.o
+perf-test: $(CORE_OBJS) src/perf_test.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 token-test: src/token_test.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
-hierarchical-chunker: $(OBJS) src/hierarchical_chunker.o
+# Our main implementation (uses rapidjson)
+hierarchical-chunker: $(CORE_OBJS) src/hierarchical_chunker.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 benchmark-passes: benchmarks/benchmark_passes.o
@@ -64,13 +57,13 @@ tokenizer-example: examples/tokenizer_example.o
 
 # Clean
 clean:
-	rm -f $(OBJS) src/*.o benchmarks/*.o examples/*.o tests/*.o $(TARGETS)
+	rm -f $(ALL_OBJS) src/*.o benchmarks/*.o examples/*.o tests/*.o $(TARGETS)
 	rm -rf out/
 	rm -f *.cmake *.sh
 	rm -f cl100k_base.tiktoken
 
 # Run test
-test: limited-test
-	./limited-test n3797.pdf
+test: hierarchical-chunker
+	./hierarchical-chunker n3797.pdf 512 50 100
 
 .PHONY: all clean test
