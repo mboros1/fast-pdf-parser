@@ -1,16 +1,19 @@
+#include <fast_pdf_parser/fast_pdf_parser.h>
+#include <fast_pdf_parser/tiktoken_tokenizer.h>
 #include <iostream>
 #include <fstream>
-#include <vector>
-#include <string>
+#include <chrono>
+#include <filesystem>
+#include <rapidjson/document.h>
+#include <rapidjson/writer.h>
+#include <rapidjson/stringbuffer.h>
+#include <regex>
 #include <algorithm>
 #include <numeric>
-#include <map>
-#include <set>
-#include <sstream>
-#include <regex>
 #include <iomanip>
-#include "../include/fast_pdf_parser/tiktoken_tokenizer.h"
+#include <set>
 
+namespace fs = std::filesystem;
 using namespace fast_pdf_parser;
 
 // Configuration constants
@@ -531,107 +534,165 @@ void analyze_chunk_distribution(const std::vector<Chunk>& chunks) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <pdf_file> [pages_limit]\n";
+    if (argc < 2 || argc > 5) {
+        std::cerr << "Usage: " << argv[0] << " <input.pdf> [max_tokens=512] [overlap_tokens=50] [pages_limit=0]\n";
         return 1;
     }
+
+    size_t max_tokens = DEFAULT_MAX_TOKENS;
+    size_t overlap_tokens = DEFAULT_OVERLAP_TOKENS;
+    int pages_limit = 0;  // 0 means no limit
     
-    std::string pdf_path = argv[1];
-    int pages_limit = (argc > 2) ? std::stoi(argv[2]) : 100;
-    
-    std::cout << "Processing PDF: " << pdf_path << " (limit: " << pages_limit << " pages)\n";
-    
-    // Simulate page extraction (in real implementation, this would use MuPDF)
-    std::vector<std::pair<std::string, int>> pages;
-    
-    // Read from a test file if it exists
-    std::ifstream test_file("test_document.txt");
-    if (test_file.is_open()) {
-        std::string content((std::istreambuf_iterator<char>(test_file)),
-                           std::istreambuf_iterator<char>());
+    if (argc >= 3) max_tokens = std::stoul(argv[2]);
+    if (argc >= 4) overlap_tokens = std::stoul(argv[3]);
+    if (argc >= 5) pages_limit = std::stoi(argv[4]);
+
+    try {
+        ParseOptions options;
+        options.thread_count = std::max(1u, std::thread::hardware_concurrency() - 1);
+        options.batch_size = 10;
+        options.extract_positions = false;
+        options.extract_fonts = false;
         
-        // Split into simulated pages
-        std::istringstream stream(content);
-        std::string line;
-        std::string page_content;
-        int page_num = 1;
-        int lines_per_page = 50;
-        int line_count = 0;
+        FastPdfParser parser(options);
         
-        while (std::getline(stream, line) && page_num <= pages_limit) {
-            page_content += line + "\n";
-            line_count++;
-            
-            if (line_count >= lines_per_page) {
-                pages.push_back({page_content, page_num});
-                page_content.clear();
-                line_count = 0;
-                page_num++;
-            }
+        std::cout << "Processing: " << argv[1] << " with " << options.thread_count << " threads\n";
+        std::cout << "Hierarchical chunking: max_tokens=" << max_tokens 
+                  << ", overlap=" << overlap_tokens 
+                  << ", min_tokens=" << DEFAULT_MIN_TOKENS << "\n";
+        if (pages_limit > 0) {
+            std::cout << "Page limit: " << pages_limit << "\n";
         }
         
-        if (!page_content.empty() && page_num <= pages_limit) {
-            pages.push_back({page_content, page_num});
-        }
-    } else {
-        // Generate test content
-        for (int i = 1; i <= std::min(10, pages_limit); ++i) {
-            std::string content = "# Chapter " + std::to_string(i) + "\n\n";
-            content += "This is the introduction to chapter " + std::to_string(i) + ".\n\n";
-            
-            content += "## Section " + std::to_string(i) + ".1\n\n";
-            for (int j = 0; j < 5; ++j) {
-                content += "This is paragraph " + std::to_string(j+1) + " of section 1. ";
-                content += "It contains some sample text to demonstrate the chunking algorithm. ";
-                content += "The text should be long enough to have meaningful token counts.\n\n";
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        fs::create_directories("./out");
+        
+        std::vector<std::string> page_texts;
+        std::vector<int> page_numbers;
+        int pages_processed = 0;
+        
+        parser.parse_streaming(argv[1], [&](PageResult result) -> bool {
+            if (result.success) {
+                std::string page_text;
+                if (result.content.contains("blocks")) {
+                    for (const auto& block : result.content["blocks"]) {
+                        for (const auto& line : block["lines"]) {
+                            if (!page_text.empty()) page_text += "\n";
+                            page_text += line["text"].get<std::string>();
+                        }
+                    }
+                }
+                page_texts.push_back(page_text);
+                page_numbers.push_back(result.page_number);
+                pages_processed++;
+                
+                // Show progress
+                if (pages_processed % 50 == 0) {
+                    std::cout << "Processed " << pages_processed << " pages...\n";
+                }
+                
+                // Check page limit
+                if (pages_limit > 0 && pages_processed >= pages_limit) {
+                    return false;  // Stop processing
+                }
             }
-            
-            content += "## Section " + std::to_string(i) + ".2\n\n";
-            for (int j = 0; j < 3; ++j) {
-                content += "Another paragraph with more content. ";
-                content += "This helps test the semantic chunking capabilities.\n";
-            }
-            
-            pages.push_back({content, i});
-        }
-    }
-    
-    std::cout << "Extracted " << pages.size() << " pages\n";
-    
-    // Initialize tokenizer
-    TiktokenTokenizer tokenizer;
-    
-    // Create chunks with enhanced merging
-    auto chunks = create_hierarchical_chunks_final(pages, tokenizer);
-    
-    std::cout << "\nCreated " << chunks.size() << " chunks\n";
-    
-    // Analyze distribution
-    analyze_chunk_distribution(chunks);
-    
-    // Output chunks for inspection
-    std::cout << "\n=== Chunk Details ===\n";
-    for (size_t i = 0; i < chunks.size(); ++i) {
-        const auto& chunk = chunks[i];
-        std::cout << "\nChunk " << (i+1) << ":\n";
-        std::cout << "  Tokens: " << chunk.tokens << "\n";
-        std::cout << "  Pages: " << chunk.start_page << "-" << chunk.end_page << "\n";
-        std::cout << "  Has major heading: " << (chunk.has_major_heading ? "Yes" : "No") << "\n";
-        if (chunk.overlap_tokens > 0) {
-            std::cout << "  Overlap tokens: " << chunk.overlap_tokens << "\n";
+            return true;
+        });
+        
+        std::cout << "Extracted " << page_texts.size() << " pages, creating hierarchical chunks...\n";
+        
+        // Prepare pages for chunking
+        std::vector<std::pair<std::string, int>> pages;
+        for (size_t i = 0; i < page_texts.size(); ++i) {
+            pages.push_back({page_texts[i], page_numbers[i]});
         }
         
-        // Show first few lines
-        std::istringstream stream(chunk.text);
-        std::string line;
-        int line_count = 0;
-        std::cout << "  First few lines:\n";
-        while (std::getline(stream, line) && line_count < 3) {
-            if (!line.empty()) {
-                std::cout << "    " << line << "\n";
-                line_count++;
+        // Create tokenizer and chunks
+        TiktokenTokenizer tokenizer;
+        auto chunks = create_hierarchical_chunks_final(pages, tokenizer, max_tokens, overlap_tokens);
+        
+        // Analyze distribution
+        analyze_chunk_distribution(chunks);
+        
+        // Output generation
+        std::hash<std::string> hasher;
+        int64_t file_hash = static_cast<int64_t>(hasher(argv[1]));
+        
+        std::string pdf_name = fs::path(argv[1]).stem().string();
+        std::ofstream outfile("./out/" + pdf_name + "_hierarchical_chunks.json");
+        
+        outfile << "[\n";
+        
+        for (size_t i = 0; i < chunks.size(); ++i) {
+            const auto& chunk = chunks[i];
+            
+            if (i > 0) outfile << ",\n";
+            
+            rapidjson::Document chunk_doc;
+            chunk_doc.SetObject();
+            auto& alloc = chunk_doc.GetAllocator();
+            
+            rapidjson::Value text_val;
+            text_val.SetString(chunk.text.c_str(), chunk.text.length(), alloc);
+            chunk_doc.AddMember("text", text_val, alloc);
+            
+            rapidjson::Value meta;
+            meta.SetObject();
+            
+            meta.AddMember("schema_name", "docling_core.transforms.chunker.DocMeta", alloc);
+            meta.AddMember("version", "1.0.0", alloc);
+            meta.AddMember("start_page", chunk.start_page, alloc);
+            meta.AddMember("end_page", chunk.end_page, alloc);
+            meta.AddMember("page_count", chunk.end_page - chunk.start_page + 1, alloc);
+            meta.AddMember("chunk_index", static_cast<int>(i), alloc);
+            meta.AddMember("total_chunks", static_cast<int>(chunks.size()), alloc);
+            meta.AddMember("token_count", chunk.tokens, alloc);
+            meta.AddMember("has_major_heading", chunk.has_major_heading, alloc);
+            meta.AddMember("min_heading_level", chunk.min_heading_level, alloc);
+            
+            if (chunk.overlap_tokens > 0) {
+                meta.AddMember("overlap_tokens", chunk.overlap_tokens, alloc);
             }
+            
+            rapidjson::Value origin;
+            origin.SetObject();
+            origin.AddMember("mimetype", "application/pdf", alloc);
+            origin.AddMember("binary_hash", file_hash, alloc);
+            
+            rapidjson::Value filename;
+            filename.SetString(fs::path(argv[1]).filename().string().c_str(), alloc);
+            origin.AddMember("filename", filename, alloc);
+            origin.AddMember("uri", rapidjson::Value().SetNull(), alloc);
+            
+            meta.AddMember("origin", origin, alloc);
+            meta.AddMember("doc_items", rapidjson::Value(rapidjson::kArrayType), alloc);
+            meta.AddMember("headings", rapidjson::Value(rapidjson::kArrayType), alloc);
+            meta.AddMember("captions", rapidjson::Value().SetNull(), alloc);
+            
+            chunk_doc.AddMember("meta", meta, alloc);
+            
+            rapidjson::StringBuffer buffer;
+            rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+            chunk_doc.Accept(writer);
+            outfile << buffer.GetString();
         }
+        
+        outfile << "\n]\n";
+        outfile.close();
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        std::cout << "\nResults:\n";
+        std::cout << "Created " << chunks.size() << " chunks from " << page_texts.size() << " pages\n";
+        std::cout << "Total time: " << duration.count() << "ms\n";
+        std::cout << "Performance: " << (page_texts.size() * 1000.0) / duration.count() << " pages/second\n";
+        std::cout << "Output: ./out/" << pdf_name << "_hierarchical_chunks.json\n";
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
     }
     
     return 0;

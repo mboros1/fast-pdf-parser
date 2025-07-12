@@ -21,7 +21,7 @@ SRCS = src/fast_pdf_parser.cpp \
 OBJS = $(SRCS:.cpp=.o)
 
 # Executables
-TARGETS = fast-pdf-parser simple-test stream-test perf-test limited-test fast-output-test docling-compatible token-test hierarchical-docling simple-hierarchical hierarchical-refactored hierarchical-enhanced hierarchical-final benchmark-passes tokenizer-example
+TARGETS = fast-pdf-parser simple-test stream-test perf-test limited-test fast-output-test token-test hierarchical-chunker benchmark-passes tokenizer-example
 
 # Default target
 all: $(TARGETS)
@@ -50,25 +50,10 @@ limited-test: $(OBJS) src/limited_test.o
 fast-output-test: $(OBJS) src/fast_output_test.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
-docling-compatible: $(OBJS) src/docling_compatible.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-
 token-test: src/token_test.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
-hierarchical-docling: $(OBJS) src/hierarchical_docling.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-
-simple-hierarchical: $(OBJS) src/simple_hierarchical.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-
-hierarchical-refactored: $(OBJS) src/hierarchical_refactored.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-
-hierarchical-enhanced: $(OBJS) src/hierarchical_enhanced.o
-	$(CXX) -o $@ $^ $(LDFLAGS)
-
-hierarchical-final: src/hierarchical_final.o
+hierarchical-chunker: $(OBJS) src/hierarchical_chunker.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 benchmark-passes: benchmarks/benchmark_passes.o
