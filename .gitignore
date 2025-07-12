@@ -1,0 +1,62 @@
+# Build outputs
+*.o
+*.a
+*.so
+*.dylib
+
+# Executables
+fast-pdf-parser
+simple-test
+stream-test
+perf-test
+limited-test
+fast-output-test
+docling-compatible
+token-test
+hierarchical-docling
+simple-hierarchical
+hierarchical-refactored
+hierarchical-enhanced
+hierarchical_final
+benchmark_passes
+tokenizer_example
+
+# Output directories
+out/
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Conan
+conan*
+conanbuild*
+conanrun*
+deactivate_conan*
+*.cmake
+
+# Test outputs
+*.pdf
+*.json
+test_document.txt
+
+# Temporary files
+*.tmp
+/tmp/
