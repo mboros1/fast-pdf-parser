@@ -12,9 +12,7 @@
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
-        "include",
-        "<!(brew --prefix)/include",
-        "<!(brew --prefix mupdf-tools)/include"
+        "include"
       ],
       "dependencies": [
         "<!(node -p \"require('node-addon-api').gyp\")"
@@ -25,15 +23,22 @@
         "-Wall",
         "-Wextra"
       ],
-      "libraries": [
-        "-L<!(brew --prefix)/lib",
-        "-L<!(brew --prefix mupdf-tools)/lib",
-        "-lmupdf",
-        "-lmupdf-third",
-        "-lz"
-      ],
+      "libraries": [],
       "conditions": [
         ["OS=='mac'", {
+          "include_dirs": [
+            "/opt/homebrew/include",
+            "/opt/homebrew/Cellar/mupdf-tools/1.26.3/include",
+            "/usr/local/include"
+          ],
+          "libraries": [
+            "-L/opt/homebrew/lib",
+            "-L/opt/homebrew/Cellar/mupdf-tools/1.26.3/lib",
+            "-L/usr/local/lib",
+            "-lmupdf",
+            "-lmupdf-third",
+            "-lz"
+          ],
           "xcode_settings": {
             "GCC_ENABLE_CPP_EXCEPTIONS": "YES",
             "CLANG_CXX_LANGUAGE_STANDARD": "c++17",
@@ -46,6 +51,10 @@
           }
         }],
         ["OS=='linux'", {
+          "include_dirs": [
+            "/usr/include",
+            "/usr/local/include"
+          ],
           "cflags_cc": [
             "-std=c++17",
             "-fPIC"
@@ -58,6 +67,13 @@
           ]
         }],
         ["OS=='win'", {
+          "include_dirs": [
+            "C:/vcpkg/installed/x64-windows/include"
+          ],
+          "libraries": [
+            "C:/vcpkg/installed/x64-windows/lib/mupdf.lib",
+            "C:/vcpkg/installed/x64-windows/lib/mupdf-third.lib"
+          ],
           "msvs_settings": {
             "VCCLCompilerTool": {
               "ExceptionHandling": 1,
