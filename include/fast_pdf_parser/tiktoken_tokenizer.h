@@ -63,10 +63,10 @@
 #include <algorithm>
 #include <mutex>
 
-namespace fast_pdf_parser {
-
 // Include the vocabulary data (generated with: xxd -i cl100k_base.tiktoken)
 #include "cl100k_base_data.h"
+
+namespace fast_pdf_parser {
 
 class TiktokenTokenizer {
 private:

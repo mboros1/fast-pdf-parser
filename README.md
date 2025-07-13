@@ -1,6 +1,6 @@
-# Fast PDF Parser - Hierarchical Chunker
+# Fast PDF Parser
 
-High-performance C++ PDF text extraction and hierarchical chunking library with 7-pass semantic chunking algorithm.
+A high-performance PDF text extraction and chunking library using MuPDF with Node.js bindings.
 
 ## Features
 
@@ -68,6 +68,81 @@ Achieved performance:
 - Linear scaling with thread count
 - Minimal memory overhead
 
+## Node.js Bindings
+
+### Installation
+
+```bash
+npm install
+```
+
+### Usage
+
+```javascript
+const { HierarchicalChunker, chunkPdf } = require('fast-pdf-parser');
+
+// Create a chunker instance
+const chunker = new HierarchicalChunker({
+    maxTokens: 512,      // Maximum tokens per chunk
+    minTokens: 150,      // Minimum tokens per chunk
+    overlapTokens: 0,    // Token overlap between chunks
+    threadCount: 4       // Number of worker threads
+});
+
+// Chunk a PDF file
+const result = chunker.chunkFile('document.pdf');
+
+console.log(`Created ${result.totalChunks} chunks from ${result.totalPages} pages`);
+console.log(`Processing took ${result.processingTimeMs}ms`);
+
+// Access chunks
+result.chunks.forEach(chunk => {
+    console.log(`Chunk: ${chunk.tokenCount} tokens, pages ${chunk.startPage}-${chunk.endPage}`);
+    console.log(`Text: ${chunk.text.substring(0, 100)}...`);
+});
+
+// Or use the convenience function
+const result2 = chunkPdf('document.pdf', { 
+    maxTokens: 400,
+    pageLimit: 10  // Process only first 10 pages
+});
+```
+
+### TypeScript Support
+
+Full TypeScript definitions are included in `lib/index.d.ts`.
+
+## C++ Library API
+
+```cpp
+#include "fast_pdf_parser/hierarchical_chunker.h"
+
+using namespace fast_pdf_parser;
+
+// Configure options
+ChunkOptions options;
+options.max_tokens = 512;
+options.min_tokens = 150;
+options.thread_count = 8;
+
+// Create chunker
+HierarchicalChunker chunker(options);
+
+// Process PDF
+ChunkingResult result = chunker.chunk_file("document.pdf");
+
+if (result.error.empty()) {
+    std::cout << "Created " << result.total_chunks << " chunks\n";
+    for (const auto& chunk : result.chunks) {
+        std::cout << "Chunk: " << chunk.token_count << " tokens\n";
+    }
+}
+```
+
 ## Development
 
 See ONBOARDING.md for detailed development setup instructions.
+
+## License
+
+MIT

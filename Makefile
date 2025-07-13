@@ -19,17 +19,20 @@ SRCS = src/fast_pdf_parser.cpp \
 OBJS = $(SRCS:.cpp=.o)
 
 # Executables
-TARGETS = hierarchical-chunker perf-test token-test benchmark-passes tokenizer-example
+TARGETS = chunk-pdf-cli perf-test token-test benchmark-passes tokenizer-example
+
+# Library
+LIBRARY = libhierarchicalchunker.a
 
 # Default target
-all: $(TARGETS)
+all: $(TARGETS) $(LIBRARY)
 
 # Build library object files
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Main implementation
-hierarchical-chunker: $(OBJS) src/hierarchical_chunker.o
+# Main CLI program
+chunk-pdf-cli: $(OBJS) src/chunk_pdf_cli.o src/hierarchical_chunker.o src/cl100k_base_data.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 # Test programs
@@ -45,15 +48,19 @@ benchmark-passes: benchmarks/benchmark_passes.o
 tokenizer-example: examples/tokenizer_example.o
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
+# Library target
+$(LIBRARY): $(OBJS) src/hierarchical_chunker.o src/cl100k_base_data.o
+	ar rcs $@ $^
+
 # Clean
 clean:
-	rm -f $(OBJS) src/*.o benchmarks/*.o examples/*.o tests/*.o $(TARGETS)
+	rm -f $(OBJS) src/*.o benchmarks/*.o examples/*.o tests/*.o $(TARGETS) $(LIBRARY)
 	rm -rf out/
 	rm -f *.cmake *.sh
 	rm -f cl100k_base.tiktoken
 
 # Run test
-test: hierarchical-chunker
-	./hierarchical-chunker n3797.pdf 512 50 100
+test: chunk-pdf-cli
+	./chunk-pdf-cli n3797.pdf 512 50 100
 
 .PHONY: all clean test
