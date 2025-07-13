@@ -1,3 +1,4 @@
+#include <fast_pdf_parser/hierarchical_chunker.h>
 #include <fast_pdf_parser/fast_pdf_parser.h>
 #include <fast_pdf_parser/tiktoken_tokenizer.h>
 #include <iostream>
@@ -412,12 +413,12 @@ std::vector<Chunk> final_merge_pass(const std::vector<Chunk>& chunks,
     return final_chunks;
 }
 
-// Main chunking function
-std::vector<Chunk> create_hierarchical_chunks_final(const std::vector<std::pair<std::string, int>>& pages,
-                                                    const TiktokenTokenizer& tokenizer,
-                                                    int max_tokens = DEFAULT_MAX_TOKENS,
-                                                    int overlap_tokens = DEFAULT_OVERLAP_TOKENS,
-                                                    int min_tokens = DEFAULT_MIN_TOKENS) {
+// Internal chunking function
+static std::vector<Chunk> create_hierarchical_chunks_internal(const std::vector<std::pair<std::string, int>>& pages,
+                                                              const TiktokenTokenizer& tokenizer,
+                                                              int max_tokens = DEFAULT_MAX_TOKENS,
+                                                              int overlap_tokens = DEFAULT_OVERLAP_TOKENS,
+                                                              int min_tokens = DEFAULT_MIN_TOKENS) {
     
     // Filter out empty pages
     std::vector<std::pair<std::string, int>> non_empty_pages;
@@ -460,7 +461,7 @@ std::vector<Chunk> create_hierarchical_chunks_final(const std::vector<std::pair<
     return chunks;
 }
 
-void analyze_chunk_distribution(const std::vector<Chunk>& chunks) {
+static void analyze_chunk_distribution(const std::vector<Chunk>& chunks) {
     if (chunks.empty()) {
         std::cout << "No chunks to analyze\n";
         return;
@@ -531,99 +532,122 @@ void analyze_chunk_distribution(const std::vector<Chunk>& chunks) {
     }
 }
 
-int main(int argc, char* argv[]) {
-    if (argc < 2 || argc > 5) {
-        std::cerr << "Usage: " << argv[0] << " <input.pdf> [max_tokens=512] [overlap_tokens=50] [pages_limit=0]\n";
-        return 1;
-    }
+// Implementation of HierarchicalChunker class
+namespace fast_pdf_parser {
 
-    size_t max_tokens = DEFAULT_MAX_TOKENS;
-    size_t overlap_tokens = DEFAULT_OVERLAP_TOKENS;
-    int pages_limit = 0;  // 0 means no limit
+class HierarchicalChunker::Impl {
+public:
+    ChunkOptions options;
+    TiktokenTokenizer tokenizer;
     
-    if (argc >= 3) max_tokens = std::stoul(argv[2]);
-    if (argc >= 4) overlap_tokens = std::stoul(argv[3]);
-    if (argc >= 5) pages_limit = std::stoi(argv[4]);
+    Impl(const ChunkOptions& opts) : options(opts) {}
+};
 
+HierarchicalChunker::HierarchicalChunker(const ChunkOptions& options) 
+    : pImpl(std::make_unique<Impl>(options)) {
+}
+
+HierarchicalChunker::~HierarchicalChunker() = default;
+
+ChunkingResult HierarchicalChunker::chunk_file(const std::string& pdf_path, int page_limit) {
+    ChunkingResult result;
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
     try {
-        ParseOptions options;
-        options.thread_count = std::max(1u, std::thread::hardware_concurrency() - 1);
-        options.batch_size = 10;
-        options.extract_positions = false;
-        options.extract_fonts = false;
+        // Set up parser options
+        ParseOptions parse_opts;
+        parse_opts.thread_count = pImpl->options.thread_count > 0 ? 
+            pImpl->options.thread_count : std::thread::hardware_concurrency();
+        parse_opts.batch_size = 10;
+        parse_opts.extract_positions = false;
+        parse_opts.extract_fonts = false;
         
-        FastPdfParser parser(options);
+        FastPdfParser parser(parse_opts);
         
-        std::cout << "Processing: " << argv[1] << " with " << options.thread_count << " threads\n";
-        std::cout << "Hierarchical chunking: max_tokens=" << max_tokens 
-                  << ", overlap=" << overlap_tokens 
-                  << ", min_tokens=" << DEFAULT_MIN_TOKENS << "\n";
-        if (pages_limit > 0) {
-            std::cout << "Page limit: " << pages_limit << "\n";
-        }
+        // Extract pages
+        std::vector<std::pair<std::string, int>> pages;
+        int page_count = 0;
         
-        auto start = std::chrono::high_resolution_clock::now();
-        
-        fs::create_directories("./out");
-        
-        std::vector<std::string> page_texts;
-        std::vector<int> page_numbers;
-        int pages_processed = 0;
-        
-        parser.parse_streaming(argv[1], [&](PageResult result) -> bool {
-            if (result.success) {
-                std::string page_text;
-                if (result.content.contains("blocks")) {
-                    for (const auto& block : result.content["blocks"]) {
-                        for (const auto& line : block["lines"]) {
-                            if (!page_text.empty()) page_text += "\n";
-                            page_text += line["text"].get<std::string>();
-                        }
+        parser.parse_streaming(pdf_path, [&](PageResult page_result) -> bool {
+            if (!page_result.success) {
+                return true; // Continue despite individual page errors
+            }
+            
+            page_count++;
+            
+            // Extract text from the page result - properly formatted
+            std::string page_text;
+            if (page_result.content.contains("blocks")) {
+                for (const auto& block : page_result.content["blocks"]) {
+                    for (const auto& line : block["lines"]) {
+                        if (!page_text.empty()) page_text += "\n";
+                        page_text += line["text"].get<std::string>();
                     }
                 }
-                page_texts.push_back(page_text);
-                page_numbers.push_back(result.page_number);
-                pages_processed++;
-                
-                // Show progress
-                if (pages_processed % 50 == 0) {
-                    std::cout << "Processed " << pages_processed << " pages...\n";
-                }
-                
-                // Check page limit
-                if (pages_limit > 0 && pages_processed >= pages_limit) {
-                    return false;  // Stop processing
-                }
             }
+            
+            pages.push_back({page_text, page_result.page_number});
+            
+            // Stop if we've hit the page limit
+            if (page_limit > 0 && page_count >= page_limit) {
+                return false;
+            }
+            
             return true;
         });
         
-        std::cout << "Extracted " << page_texts.size() << " pages, creating hierarchical chunks...\n";
+        result.total_pages = page_count;
         
-        // Prepare pages for chunking
-        std::vector<std::pair<std::string, int>> pages;
-        for (size_t i = 0; i < page_texts.size(); ++i) {
-            pages.push_back({page_texts[i], page_numbers[i]});
+        // Create chunks
+        auto chunks = create_hierarchical_chunks_internal(
+            pages,
+            pImpl->tokenizer,
+            pImpl->options.max_tokens,
+            pImpl->options.overlap_tokens,
+            pImpl->options.min_tokens
+        );
+        
+        // Convert to ChunkResult
+        for (const auto& chunk : chunks) {
+            ChunkResult chunk_result;
+            chunk_result.text = chunk.text;
+            chunk_result.token_count = chunk.tokens;
+            chunk_result.start_page = chunk.start_page;
+            chunk_result.end_page = chunk.end_page;
+            chunk_result.has_major_heading = chunk.has_major_heading;
+            chunk_result.min_heading_level = chunk.min_heading_level;
+            
+            result.chunks.push_back(chunk_result);
         }
         
-        // Create tokenizer and chunks
-        TiktokenTokenizer tokenizer;
-        auto chunks = create_hierarchical_chunks_final(pages, tokenizer, max_tokens, overlap_tokens);
+        result.total_chunks = result.chunks.size();
         
-        // Analyze distribution
-        analyze_chunk_distribution(chunks);
+    } catch (const std::exception& e) {
+        result.error = std::string("Error chunking PDF: ") + e.what();
+    }
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    result.processing_time_ms = duration.count();
+    
+    return result;
+}
+
+bool HierarchicalChunker::process_pdf_to_json(const std::string& pdf_path, const std::string& output_path, int page_limit) {
+    try {
+        auto result = chunk_file(pdf_path, page_limit);
         
-        // Output generation
-        std::hash<std::string> hasher;
-        int64_t file_hash = static_cast<int64_t>(hasher(argv[1]));
+        if (!result.error.empty()) {
+            return false;
+        }
         
-        std::string pdf_name = fs::path(argv[1]).stem().string();
-        std::ofstream outfile("./out/" + pdf_name + "_hierarchical_chunks.json");
-        
+        // Generate JSON output
         nlohmann::json output = nlohmann::json::array();
+        std::hash<std::string> hasher;
+        int64_t file_hash = static_cast<int64_t>(hasher(pdf_path));
         
-        for (size_t i = 0; i < chunks.size(); ++i) {
-            const auto& chunk = chunks[i];
+        for (size_t i = 0; i < result.chunks.size(); ++i) {
+            const auto& chunk = result.chunks[i];
             
             nlohmann::json chunk_json;
             chunk_json["text"] = chunk.text;
@@ -635,19 +659,15 @@ int main(int argc, char* argv[]) {
             meta["end_page"] = chunk.end_page;
             meta["page_count"] = chunk.end_page - chunk.start_page + 1;
             meta["chunk_index"] = static_cast<int>(i);
-            meta["total_chunks"] = static_cast<int>(chunks.size());
-            meta["token_count"] = chunk.tokens;
+            meta["total_chunks"] = result.total_chunks;
+            meta["token_count"] = chunk.token_count;
             meta["has_major_heading"] = chunk.has_major_heading;
             meta["min_heading_level"] = chunk.min_heading_level;
-            
-            if (chunk.overlap_tokens > 0) {
-                meta["overlap_tokens"] = chunk.overlap_tokens;
-            }
             
             nlohmann::json origin;
             origin["mimetype"] = "application/pdf";
             origin["binary_hash"] = file_hash;
-            origin["filename"] = fs::path(argv[1]).filename().string();
+            origin["filename"] = fs::path(pdf_path).filename().string();
             origin["uri"] = nullptr;
             
             meta["origin"] = origin;
@@ -659,22 +679,24 @@ int main(int argc, char* argv[]) {
             output.push_back(chunk_json);
         }
         
+        std::ofstream outfile(output_path);
         outfile << output.dump(2);
         outfile.close();
         
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        
-        std::cout << "\nResults:\n";
-        std::cout << "Created " << chunks.size() << " chunks from " << page_texts.size() << " pages\n";
-        std::cout << "Total time: " << duration.count() << "ms\n";
-        std::cout << "Performance: " << (page_texts.size() * 1000.0) / duration.count() << " pages/second\n";
-        std::cout << "Output: ./out/" << pdf_name << "_hierarchical_chunks.json\n";
+        return true;
         
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-        return 1;
+        return false;
     }
-    
-    return 0;
 }
+
+ChunkOptions HierarchicalChunker::get_options() const {
+    return pImpl->options;
+}
+
+void HierarchicalChunker::set_options(const ChunkOptions& options) {
+    pImpl->options = options;
+}
+
+} // namespace fast_pdf_parser
+
