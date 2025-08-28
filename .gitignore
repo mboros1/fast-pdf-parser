@@ -3,60 +3,165 @@
 *.a
 *.so
 *.dylib
-
-# Executables
-fast-pdf-parser
-simple-test
-stream-test
+*.dll
+*.lib
+*.exe
+chunk-pdf-cli
 perf-test
-limited-test
-fast-output-test
-docling-compatible
 token-test
-hierarchical-docling
-simple-hierarchical
-hierarchical-refactored
-hierarchical-enhanced
-hierarchical_final
-benchmark_passes
-tokenizer_example
+benchmark-passes
+tokenizer-example
+libhierarchicalchunker.a
 
-# Output directories
-out/
+# Build directories
 build/
+out/
+batch_test_output/
+Debug/
+Release/
+cmake-build-*/
+.cmake/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.npm
+*.tgz
+prebuilds/
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
-.venv/
+*.egg-info/
+dist/
+*.egg
+.Python
 venv/
 env/
-*.egg-info/
+ENV/
 
-# IDE
+# IDE and editors
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
+*.sublime-project
+*.sublime-workspace
+.project
+.cproject
+.settings/
 
-# Conan
-conan*
-conanbuild*
-conanrun*
-deactivate_conan*
-*.cmake
+# Test and coverage
+coverage/
+*.lcov
+.nyc_output/
+*.gcno
+*.gcda
+*.gcov
+test_output.json
 
-# Test outputs
+# Documentation
+docs/_build/
+docs/html/
+*.doxygen
+
+# Logs
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# Data files (too large for git)
 *.pdf
+!test_pdfs/*.pdf
+!samples/*.pdf
+*.tiktoken
+
+# Output files
 *.json
-test_document.txt
+!package.json
+!package-lock.json
+!binding.gyp
+!jsdoc.json
+!tsconfig.json
+*.csv
+*.txt
+!LICENSE.txt
+!README.txt
 
 # Temporary files
 *.tmp
-/tmp/
+*.temp
+*.bak
+*.backup
+*.old
+.cache/
+tmp/
+temp/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile.cmake
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+*.cmake
+!CMakeLists.txt
+
+# Conan
+conan.lock
+graph_info.json
+conaninfo.txt
+conanbuildinfo.*
+
+# Native builds
+/build/
+/prebuilds/
+/bin/
+/lib/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Core dumps
+core
+core.*
+*.core
+
+# Benchmarking
+benchmark_results.txt
+perf.data
+perf.data.old
+*.bench
+
+# Large test data
+test_data/
+samples/pdf/
+samples/json/
+!samples/pdf/.gitkeep
+!samples/json/.gitkeep

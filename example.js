@@ -12,10 +12,10 @@ const chunker = new HierarchicalChunker({
 console.log('Chunker options:', chunker.getOptions());
 
 // Chunk a PDF file
-const pdfPath = path.join(__dirname, 'test_pdfs', 'ml_paper_2024.pdf');
+const pdfPath = path.join(__dirname, 'n3797.pdf');
 console.log(`\nChunking ${pdfPath}...`);
 
-const result = chunker.chunkFile(pdfPath);
+const result = chunker.chunkFile(pdfPath, 20); // Process first 20 pages
 
 console.log('\nResults:');
 console.log(`  Pages processed: ${result.totalPages}`);
