@@ -6,14 +6,10 @@
 *.dll
 *.lib
 *.exe
-chunk-pdf-cli
-perf-test
-token-test
-benchmark-passes
-tokenizer-example
-libhierarchicalchunker.a
 
 # Build directories
+bin/
+obj/
 build/
 out/
 batch_test_output/
@@ -21,6 +17,15 @@ Debug/
 Release/
 cmake-build-*/
 .cmake/
+
+# Old executables in root (cleanup)
+chunk-pdf-cli
+perf-test
+token-test
+benchmark-passes
+tokenizer-example
+test-runner
+libhierarchicalchunker.a
 
 # Node.js
 node_modules/

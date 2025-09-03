@@ -700,3 +700,86 @@ void HierarchicalChunker::set_options(const ChunkOptions& options) {
 
 } // namespace fast_pdf_parser
 
+// Unit tests  
+#ifdef ENABLE_TESTS
+#include "../deps/doctest.h"
+
+TEST_CASE("HierarchicalChunker text chunking") {
+    using namespace fast_pdf_parser;
+    
+    SUBCASE("Basic chunking functionality") {
+        ChunkOptions opts;
+        opts.max_tokens = 100;
+        opts.min_tokens = 50;
+        opts.overlap_tokens = 10;
+        
+        HierarchicalChunker chunker(opts);
+        CHECK(chunker.get_options().max_tokens == 100);
+        CHECK(chunker.get_options().min_tokens == 50);
+        CHECK(chunker.get_options().overlap_tokens == 10);
+    }
+    
+    SUBCASE("Options modification") {
+        ChunkOptions initial_opts;
+        initial_opts.max_tokens = 512;
+        
+        HierarchicalChunker chunker(initial_opts);
+        
+        ChunkOptions new_opts;
+        new_opts.max_tokens = 1024;
+        new_opts.min_tokens = 200;
+        
+        chunker.set_options(new_opts);
+        auto current = chunker.get_options();
+        
+        CHECK(current.max_tokens == 1024);
+        CHECK(current.min_tokens == 200);
+    }
+}
+
+TEST_CASE("ChunkResult structure") {
+    using namespace fast_pdf_parser;
+    
+    SUBCASE("ChunkResult fields") {
+        ChunkResult chunk;
+        chunk.text = "Test text";
+        chunk.token_count = 10;
+        chunk.start_page = 0;
+        chunk.end_page = 1;
+        chunk.has_major_heading = true;
+        chunk.min_heading_level = 2;
+        
+        CHECK(chunk.text == "Test text");
+        CHECK(chunk.token_count == 10);
+        CHECK(chunk.start_page == 0);
+        CHECK(chunk.end_page == 1);
+        CHECK(chunk.has_major_heading == true);
+        CHECK(chunk.min_heading_level == 2);
+    }
+}
+
+TEST_CASE("ChunkingResult structure") {
+    using namespace fast_pdf_parser;
+    
+    SUBCASE("ChunkingResult fields") {
+        ChunkingResult result;
+        result.total_pages = 10;
+        result.total_chunks = 5;
+        result.processing_time_ms = 1000;
+        result.error = "";
+        
+        ChunkResult chunk;
+        chunk.text = "Sample chunk";
+        chunk.token_count = 50;
+        result.chunks.push_back(chunk);
+        
+        CHECK(result.total_pages == 10);
+        CHECK(result.total_chunks == 5);
+        CHECK(result.processing_time_ms == 1000);
+        CHECK(result.error.empty());
+        CHECK(result.chunks.size() == 1);
+        CHECK(result.chunks[0].text == "Sample chunk");
+    }
+}
+#endif // ENABLE_TESTS
+
